@@ -9,12 +9,12 @@ untuk menjalankan container checkmk ada 2 cara
 ## Docker Run
 ```bash
 docker container run -it \
---name checkmk-monitoring --restart always \
+--name checkmk-server --restart always \
 -p 5000:5000 -p 6557:6557 \
---tmpfs /opt/omd/sites/ho/tmp:uid=1000,gid=1000 \
--v checkmk-ho:/omd/sites -v /etc/localtime:/etc/localtime:ro \
--e CMK_SITE_ID=ho \
--d checkmk/check-mk-raw:2.1.0-latest
+--tmpfs /opt/omd/sites/checkmk/tmp:uid=1000,gid=1000 \
+-v checkmk-volume:/omd/sites -v /etc/localtime:/etc/localtime:ro \
+-e CMK_SITE_ID=checkmk \
+-d checkmk/check-mk-raw:2.0.0-latest
 ```
 ## Docker Compose
 
@@ -55,7 +55,7 @@ kedua metode di atas juga dapat di jalankan dengan argument `-H ssh://USER@IPSER
 ## Login Checkmk Server
 setelah berhasil di jalankan menggunakan method ke-1 ataupun yang ke-2, sekarang tiba saatnya untuk testing menggunakan browser.
 
-sebelum itu kita perlu menjalankan perintah `docker logs checkmk-monitoring` untuk mengetahui default password dari user `cmkadmin`, pada contoh dibawah terlihat password default user `cmkadmin` adalah `EVtsZDQ7`, untuk mengganti password default bisa menggunakan perintah `docker exec -it checkmk-monitoring omd su monitoring` lalu `htpasswd etc/htpasswd cmkadmin`, masukan password baru dan ulangi kembali
+sebelum itu kita perlu menjalankan perintah `docker logs checkmk-server` untuk mengetahui default password dari user `cmkadmin`, pada contoh dibawah terlihat password default user `cmkadmin` adalah `EVtsZDQ7`, untuk mengganti password default bisa menggunakan perintah `docker exec -it checkmk-server omd su checkmk` lalu `htpasswd etc/htpasswd cmkadmin`, masukan password baru dan ulangi kembali
 
 ![3.png](img/3.png)
 
