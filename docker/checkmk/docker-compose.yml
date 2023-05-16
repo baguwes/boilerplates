@@ -1,0 +1,21 @@
+version: '3.7'
+services:
+  checkmk-server:
+    container_name: checkmk-server
+    image: checkmk/check-mk-raw:2.0.0-latest
+    restart: always
+    tmpfs:
+      - /opt/omd/sites/checkmk/tmp:uid=1000,gid=1000
+    ulimits:
+      nofile: 1024
+    volumes:
+      - '/etc/localtime:/etc/localtime:ro'
+      - 'checkmk-volume:/omd/sites'
+    ports:
+      - '8800:5000'
+      - '6557:6557'
+    environment:
+      - CMK_SITE_ID=checkmk
+volumes:
+  checkmk-volume:
+    name: checkmk-volume
