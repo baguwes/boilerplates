@@ -1,0 +1,3 @@
+*.auto.*
+.terraform
+!secret.auto copy.example

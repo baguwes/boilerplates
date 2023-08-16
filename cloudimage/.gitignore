@@ -1,0 +1,5 @@
+*.img
+*qcow2
+*.sh
+!hlp_init.sh
+!template.sh
