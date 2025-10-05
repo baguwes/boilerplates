@@ -1,0 +1,212 @@
+x-docker-data: &defaults
+    restart: unless-stopped
+    # environment: &env
+    #   TZ: ${TZ}
+
+    #   NGINX_METRICS_ENABLED: "${NGINX_METRICS_ENABLED}"
+    #   DD_UWSGI_HOST: "${DD_UWSGI_HOST}"
+    #   DD_UWSGI_PORT: "${DD_UWSGI_PORT}"
+
+    #   DD_DEBUG: 'False'
+    #   DD_DJANGO_METRICS_ENABLED: "${DD_DJANGO_METRICS_ENABLED}"
+    #   DD_ALLOWED_HOSTS: "${DD_ALLOWED_HOSTS}"
+    #   DD_DATABASE_URL: ${DD_DATABASE_URL}
+    #   DD_CELERY_BROKER_URL: ${DD_CELERY_BROKER_URL}
+    #   DD_SECRET_KEY: "${DD_SECRET_KEY}"
+    #   DD_CREDENTIAL_AES_256_KEY: "${DD_CREDENTIAL_AES_256_KEY}"
+    #   DD_DATABASE_READINESS_TIMEOUT: "${DD_DATABASE_READINESS_TIMEOUT}"
+
+    #   DD_ADMIN_USER: "${DD_ADMIN_USER}"
+    #   DD_ADMIN_MAIL: "${DD_ADMIN_USER}"
+    #   DD_ADMIN_FIRST_NAME: "${DD_ADMIN_FIRST_NAME}"
+    #   DD_ADMIN_LAST_NAME: "${DD_ADMIN_LAST_NAME}"
+    #   DD_INITIALIZE: "${DD_INITIALIZE}"
+
+    #   POSTGRES_USER: ${POSTGRES_USER}
+    #   POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    #   POSTGRES_DB: ${POSTGRES_DB}
+
+    logging:
+      driver: "json-file"
+      options:
+        max-file: 1
+        max-size: 100m
+    networks:
+      - defectdojo-network
+# ---
+services:
+  defectdojo-nginx:
+    <<: *defaults
+    container_name: defectdojo-nginx
+    image: "${DD_NGINX}"
+    depends_on:
+      defectdojo-django:
+        condition: service_started
+    environment:
+      NGINX_METRICS_ENABLED: "${NGINX_METRICS_ENABLED}"
+      DD_UWSGI_HOST: "${DD_UWSGI_HOST}"
+      DD_UWSGI_PORT: "${DD_UWSGI_PORT}"
+    volumes:
+      - defectdojo-media:/usr/share/nginx/html/media
+    # ports:
+    #   - 8080:${DD_PORT}
+    #   - 8443:${DD_TLS_PORT}
+    labels:
+      - traefik.enable=true
+      - traefik.http.services.defectdojo.loadbalancer.server.port=${DD_PORT}
+      - traefik.http.services.defectdojo.loadbalancer.server.scheme=http
+      - traefik.http.routers.defectdojo.service=defectdojo
+      - traefik.http.routers.defectdojo.entrypoints=websecure
+      - traefik.http.routers.defectdojo.rule=Host(`defectdojo.your-domain.com`)
+      - traefik.http.routers.defectdojo.tls=true
+      - traefik.http.routers.defectdojo.tls.certresolver=cloudflare
+    networks:
+      - defectdojo-network
+      - traefik-network
+
+  defectdojo-django:
+    <<: *defaults
+    container_name: defectdojo-django
+    image: "${DD_DJANGO}"
+    depends_on:
+      defectdojo-initializer:
+        condition: service_completed_successfully
+      defectdojo-postgres:
+        condition: service_started
+      defectdojo-redis:
+        condition: service_started
+    entrypoint: ['/wait-for-it.sh', '${DD_DATABASE_HOST}:${DD_DATABASE_PORT:-5432}', '-t', '30', '--', '/entrypoint-uwsgi.sh']
+    environment:
+      DD_DEBUG: 'False'
+      DD_DJANGO_METRICS_ENABLED: "${DD_DJANGO_METRICS_ENABLED}"
+      DD_ALLOWED_HOSTS: "${DD_ALLOWED_HOSTS}"
+      DD_DATABASE_URL: ${DD_DATABASE_URL}
+      DD_CELERY_BROKER_URL: ${DD_CELERY_BROKER_URL}
+      DD_SECRET_KEY: "${DD_SECRET_KEY}"
+      DD_CREDENTIAL_AES_256_KEY: "${DD_CREDENTIAL_AES_256_KEY}"
+      DD_DATABASE_READINESS_TIMEOUT: "${DD_DATABASE_READINESS_TIMEOUT}"
+    volumes:
+      - ./docker/extra_settings:/app/docker/extra_settings
+      - "defectdojo-media:${DD_MEDIA_ROOT:-/app/media}"
+
+  defectdojo-celerybeat:
+    <<: *defaults
+    container_name: defectdojo-celerybeat
+    image: "${DD_DJANGO}"
+    depends_on:
+      defectdojo-initializer:
+        condition: service_completed_successfully
+      defectdojo-postgres:
+        condition: service_started
+      defectdojo-redis:
+        condition: service_started
+    entrypoint: ['/wait-for-it.sh', '${DD_DATABASE_HOST:-postgres}:${DD_DATABASE_PORT:-5432}', '-t', '30', '--', '/entrypoint-celery-beat.sh']
+    environment:
+      DD_DATABASE_URL: "${DD_DATABASE_URL}"
+      DD_CELERY_BROKER_URL: "${DD_CELERY_BROKER_URL}"
+      DD_SECRET_KEY: "${DD_SECRET_KEY}"
+      DD_CREDENTIAL_AES_256_KEY: "${DD_CREDENTIAL_AES_256_KEY}"
+      DD_DATABASE_READINESS_TIMEOUT: "${DD_DATABASE_READINESS_TIMEOUT}"
+    volumes:
+      - ./docker/extra_settings:/app/docker/extra_settings
+
+  defectdojo-celeryworker:
+    <<: *defaults
+    container_name: defectdojo-celeryworker
+    image: "${DD_DJANGO}"
+    depends_on:
+      defectdojo-initializer:
+        condition: service_completed_successfully
+      defectdojo-postgres:
+        condition: service_started
+      defectdojo-redis:
+        condition: service_started
+    entrypoint: ['/wait-for-it.sh', '${DD_DATABASE_HOST:-postgres}:${DD_DATABASE_PORT:-5432}', '-t', '30', '--', '/entrypoint-celery-worker.sh']
+    environment:
+      DD_DATABASE_URL: "${DD_DATABASE_URL}"
+      DD_CELERY_BROKER_URL: "${DD_CELERY_BROKER_URL}"
+      DD_SECRET_KEY: "${DD_SECRET_KEY}"
+      DD_CREDENTIAL_AES_256_KEY: "${DD_CREDENTIAL_AES_256_KEY}"
+      DD_DATABASE_READINESS_TIMEOUT: "${DD_DATABASE_READINESS_TIMEOUT}"
+    volumes:
+      - ./docker/extra_settings:/app/docker/extra_settings
+      - "defectdojo-media:${DD_MEDIA_ROOT:-/app/media}"
+
+  defectdojo-initializer:
+    <<: *defaults
+    container_name: defectdojo-initializer
+    image: "${DD_DJANGO}"
+    restart: no
+    depends_on:
+      defectdojo-postgres:
+        condition: service_started
+    entrypoint: ['/wait-for-it.sh', '${DD_DATABASE_HOST}:${DD_DATABASE_PORT:-5432}', '--', '/entrypoint-initializer.sh']
+    environment:
+      DD_DATABASE_URL: "${DD_DATABASE_URL}"
+      DD_ADMIN_USER: "${DD_ADMIN_USER}"
+      DD_ADMIN_MAIL: "${DD_ADMIN_USER}"
+      DD_ADMIN_FIRST_NAME: "${DD_ADMIN_FIRST_NAME}"
+      DD_ADMIN_LAST_NAME: "${DD_ADMIN_LAST_NAME}"
+      DD_INITIALIZE: "${DD_INITIALIZE}"
+      DD_SECRET_KEY: "${DD_SECRET_KEY}"
+      DD_CREDENTIAL_AES_256_KEY: "${DD_CREDENTIAL_AES_256_KEY}"
+      DD_DATABASE_READINESS_TIMEOUT: "${DD_DATABASE_READINESS_TIMEOUT}"
+    volumes:
+      - ./docker/extra_settings:/app/docker/extra_settings
+
+  defectdojo-postgres:
+    <<: *defaults
+    container_name: defectdojo-postgres
+    image: ${POSTGRES_IMAGE}
+    # ports:
+    #   - 5432:5432
+    volumes:
+      - defectdojo-postgres:/var/lib/postgresql/data
+    environment:
+      TZ: ${TZ}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "${POSTGRES_USER}"']
+      start_period: 30s
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  defectdojo-redis:
+    <<: *defaults
+    container_name: defectdojo-redis
+    image: ${REDIS_IMAGE}
+    command: --save 60 1 --loglevel warning
+    # ports:
+    #   - 6379:6379
+    volumes:
+      - defectdojo-redis:/data
+    environment:
+      TZ: ${TZ}
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 3s
+
+volumes:
+  defectdojo-postgres:
+    name: defectdojo-postgres
+    external: true
+  defectdojo-media:
+    name: defectdojo-media
+    external: true
+  defectdojo-redis:
+    name: defectdojo-redis
+    external: true
+
+networks:
+  defectdojo-network:
+    name: defectdojo-network
+    external: true
+  traefik-network:
+    name: traefik-network
+    external: true

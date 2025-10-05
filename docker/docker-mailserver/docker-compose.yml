@@ -1,0 +1,154 @@
+x-docker-data: &defaults
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-file: 1
+        max-size: 100m
+    network_mode: bridge
+
+services:
+  docker-mailserver:
+    <<: *defaults
+    container_name: docker-mailserver
+    image: mailserver/docker-mailserver:15.1.0
+    hostname: ${OVERRIDE_HOSTNAME}
+    env_file: .env
+    ports:
+      - "25:25"    # SMTP  (explicit TLS => STARTTLS)
+      - "143:143"  # IMAP4 (explicit TLS => STARTTLS)
+      - "465:465"  # ESMTP (implicit TLS)
+      - "587:587"  # ESMTP (explicit TLS => STARTTLS)
+      - "993:993"  # IMAP4 (implicit TLS)
+      - "110:110"  # POP3
+      - "995:995"  # POP3 (with TLS)
+      - "4190:4190" # Managesieve
+    volumes:
+      - /opt/docker/docker-mailserver/certs:/etc/letsencrypt:ro
+      - /opt/docker/docker-mailserver/config:/tmp/docker-mailserver
+      - /opt/docker/docker-mailserver/data:/var/mail
+      - /opt/docker/docker-mailserver/log:/var/log/mail
+      - /opt/docker/docker-mailserver/state:/var/mail-state
+      - /etc/localtime:/etc/localtime:ro
+    stop_grace_period: 1m
+    cap_add:
+      - NET_ADMIN
+    healthcheck:
+      test: "ss --listening --tcp | grep -P 'LISTEN.+:smtp' || exit 1"
+      timeout: 3s
+      retries: 6
+
+  docker-mailserver-autodiscover:
+    <<: *defaults
+    container_name: docker-mailserver-autodiscover
+    image: bkempinski/autodiscover-email-settings:latest
+    environment:
+      TZ: ${TZ}
+      COMPANY_NAME: your-domain
+      SUPPORT_URL: https://autodiscover.${DOMAIN}
+      DOMAIN: ${DOMAIN}
+      # IMAP configuration (host mandatory to enable)
+      IMAP_HOST: smtp.${DOMAIN}
+      IMAP_PORT: 993
+      IMAP_SOCKET: SSL
+      # POP configuration (host mandatory to enable)
+      POP_HOST: smtp.${DOMAIN}
+      POP_PORT: 995
+      POP_SOCKET: SSL
+      # SMTP configuration (host mandatory to enable)
+      SMTP_HOST: smtp.${DOMAIN}
+      SMTP_PORT: 587
+      SMTP_SOCKET: STARTTLS
+      # MobileSync/ActiveSync configuration (url mandatory to enable)
+      MOBILESYNC_URL: https://sync.${DOMAIN}
+      MOBILESYNC_NAME: sync.${DOMAIN}
+      # LDAP configuration (host mandatory to enable)
+      # LDAP_HOST: ldap.${DOMAIN}
+      # LDAP_PORT: 636
+      # LDAP_SOCKET: SSL
+      # LDAP_BASE: dc=ldap,dc=example,dc=com
+      # LDAP_USER_FIELD: uid
+      # LDAP_USER_BASE: ou=People,dc=ldap,dc=example,dc=com
+      # LDAP_SEARCH: (|(objectClass=PostfixBookMailAccount))
+      # Apple mobile config identifiers (identifier mandatory to enable)
+      # PROFILE_IDENTIFIER: com.your-domain.autodiscover
+      # PROFILE_UUID: 92943D26-CAB3-4086-897D-DC6C0D8B1E86
+      # MAIL_UUID: 7A981A9E-D5D0-4EF8-87FE-39FD6A506FAC
+      # LDAP_UUID: 6ECB6BA9-2208-4ABF-9E60-4E9F4CD7309E
+    labels:
+      - traefik.enable=true
+      # autoconfig
+      - traefik.http.services.autoconfig.loadbalancer.server.port=8000
+      - traefik.http.services.autoconfig.loadbalancer.server.scheme=http
+      - traefik.http.routers.autoconfig.service=autoconfig
+      - traefik.http.routers.autoconfig.entrypoints=websecure
+      - traefik.http.routers.autoconfig.rule=Host(`autoconfig.${DOMAIN}`)
+      - traefik.http.routers.autoconfig.tls=true
+      - traefik.http.routers.autoconfig.tls.certresolver=cloudflare
+      # autodiscover
+      - traefik.http.services.autodiscover.loadbalancer.server.port=8000
+      - traefik.http.services.autodiscover.loadbalancer.server.scheme=http
+      - traefik.http.routers.autodiscover.service=autodiscover
+      - traefik.http.routers.autodiscover.entrypoints=websecure
+      - traefik.http.routers.autodiscover.rule=Host(`autodiscover.${DOMAIN}`)
+      - traefik.http.routers.autodiscover.tls=true
+      - traefik.http.routers.autodiscover.tls.certresolver=cloudflare
+      # sync
+      - traefik.http.services.sync.loadbalancer.server.port=8000
+      - traefik.http.services.sync.loadbalancer.server.scheme=http
+      - traefik.http.routers.sync.service=sync
+      - traefik.http.routers.sync.entrypoints=websecure
+      - traefik.http.routers.sync.rule=Host(`sync.${DOMAIN}`)
+      - traefik.http.routers.sync.tls=true
+      - traefik.http.routers.sync.tls.certresolver=cloudflare
+      # smtp
+      - traefik.http.services.smtp.loadbalancer.server.port=8000
+      - traefik.http.services.smtp.loadbalancer.server.scheme=http
+      - traefik.http.routers.smtp.service=smtp
+      - traefik.http.routers.smtp.entrypoints=websecure
+      - traefik.http.routers.smtp.rule=Host(`smtp.${DOMAIN}`)
+      - traefik.http.routers.smtp.tls=true
+      - traefik.http.routers.smtp.tls.certresolver=cloudflare
+      # imap
+      - traefik.http.services.imap.loadbalancer.server.port=8000
+      - traefik.http.services.imap.loadbalancer.server.scheme=http
+      - traefik.http.routers.imap.service=imap
+      - traefik.http.routers.imap.entrypoints=websecure
+      - traefik.http.routers.imap.rule=Host(`imap.${DOMAIN}`)
+      - traefik.http.routers.imap.tls=true
+      - traefik.http.routers.imap.tls.certresolver=cloudflare
+
+  docker-mailserver-renew:
+    <<: *defaults
+    container_name: docker-mailserver-renew
+    image: certbot/dns-cloudflare
+    entrypoint: [""]
+    volumes:
+      - /opt/docker/docker-mailserver/certs:/etc/letsencrypt
+      - /opt/docker/docker-mailserver/log:/var/log/letsencrypt
+      - /opt/docker/docker-mailserver/certs/lib:/var/lib/letsencrypt
+      - /opt/docker/docker-mailserver/cloudflare.ini:/cloudflare.ini:ro
+    environment:
+      TZ: ${TZ}
+    command: >
+      sh -c "trap exit TERM;
+              while :; do
+                date;
+                certbot renew --dns-cloudflare --dns-cloudflare-credentials /cloudflare.ini;
+                sleep 1d;
+              done"
+
+  docker-mailserver-request:
+    <<: *defaults
+    container_name: docker-mailserver-request
+    image: certbot/dns-cloudflare
+    entrypoint: [""]
+    restart: no
+    volumes:
+      - /opt/docker/docker-mailserver/certs:/etc/letsencrypt
+      - /opt/docker/docker-mailserver/log:/var/log/letsencrypt
+      - /opt/docker/docker-mailserver/certs/lib:/var/lib/letsencrypt
+      - /opt/docker/docker-mailserver/cloudflare.ini:/cloudflare.ini:ro
+    environment:
+      TZ: ${TZ}
+    command: certbot certonly -d ${OVERRIDE_HOSTNAME} --agree-tos -m ${RECIPIENT} --dns-cloudflare --dns-cloudflare-credentials /cloudflare.ini

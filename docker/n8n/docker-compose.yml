@@ -1,0 +1,88 @@
+x-docker-data: &defaults
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-file: 1
+        max-size: 100m
+# ---
+services:
+  n8n:
+    <<: *defaults
+    container_name: n8n
+    image: docker.n8n.io/n8nio/n8n:1.111.0
+    # ports:
+    #   - 5678:5678
+    volumes:
+      - n8n-home:/home/node/.n8n
+      - n8n-files:/files
+    environment:
+      TZ: ${TIMEZONE}
+      NODE_ENV: ${NODE_ENV}
+      GENERIC_TIMEZONE: ${TIMEZONE}
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: true
+      N8N_HOST: ${DOMAIN}
+      N8N_PROTOCOL: https
+      N8N_RUNNERS_ENABLED: true
+      WEBHOOK_URL: https://${DOMAIN}/
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: n8n-postgres
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_DATABASE: ${POSTGRES_DB}
+      DB_POSTGRESDB_USER: ${POSTGRES_USER}
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD}
+    depends_on:
+      - n8n-postgres
+    labels:
+      - traefik.enable=true
+      - traefik.http.services.n8n.loadbalancer.server.port=5678
+      - traefik.http.services.n8n.loadbalancer.server.scheme=http
+      - traefik.http.routers.n8n.service=n8n
+      - traefik.http.routers.n8n.rule=Host(`n8n.your-domain.com`)
+      - traefik.http.routers.n8n.entrypoints=websecure
+      - traefik.http.routers.n8n.tls=true
+      - traefik.http.routers.n8n.tls.certresolver=cloudflare
+    networks:
+      - n8n-network
+      - traefik-network
+
+  n8n-postgres:
+    <<: *defaults
+    container_name: n8n-postgres
+    image: docker.io/library/postgres:18.0-alpine
+    # ports:
+    #   - 5432:5432
+    volumes:
+      - n8n-postgres:/var/lib/postgresql/data
+    environment:
+      TZ: ${TZ}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "${POSTGRES_USER}"']
+      start_period: 30s
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    networks:
+      - n8n-network
+
+volumes:
+  n8n-home:
+    name: n8n-home
+    external: true
+  n8n-files:
+    name: n8n-files
+    external: true
+  n8n-postgres:
+    name: n8n-postgres
+    external: true
+
+networks:
+  n8n-network:
+    name: n8n-network
+    external: true
+  traefik-network:
+    name: traefik-network
+    external: true

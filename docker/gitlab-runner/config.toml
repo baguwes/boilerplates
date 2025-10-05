@@ -1,0 +1,23 @@
+concurrent = 50
+check_interval = 5
+shutdown_timeout = 10
+
+[[runners]]
+  id = 1
+  name = "HOSTNAME"
+  url = "https://gitlab.your-domain.com"
+  executor = "docker"
+  token = "<TOKEN-JOIN-RUNNER>"
+  limit = 0
+  environment = ["DOCKER_AUTH_CONFIG={\"auths\":{\"https://index.docker.io/v1/\":{\"auth\":\"<YOUR-username:password-WITH-BASE64-FORMAT>\"}}}"]
+  [runners.docker]
+    tls_verify = false
+    image = "docker:dind"
+    privileged = true
+    disable_cache = false
+    volumes = [
+        "/cache",
+        "/var/run/docker.sock:/var/run/docker.sock"
+    ]
+  [runners.cache]
+    Insecure = false

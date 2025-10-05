@@ -1,0 +1,35 @@
+# docker run -d --restart=always -p 3001:3001 -v uptime-kuma:/app/data --name uptime-kuma louislam/uptime-kuma:1
+
+services:
+  uptimekuma-dezones:
+    container_name: uptimekuma-dezones
+    image: louislam/uptime-kuma:1.23.16
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-file: 1
+        max-size: 100m
+    volumes:
+      - uptimekuma-data:/app/data
+    labels:
+      - traefik.enable=true
+      - traefik.http.services.uptimekuma.loadbalancer.server.port=3001
+      - traefik.http.services.uptimekuma.loadbalancer.server.scheme=http
+      - traefik.http.routers.uptimekuma.service=uptimekuma
+      - traefik.http.routers.uptimekuma.entrypoints=websecure
+      - traefik.http.routers.uptimekuma.rule=Host(`uptimekuma.your-domain.com`)
+      - traefik.http.routers.uptimekuma.tls=true
+      - traefik.http.routers.uptimekuma.tls.certresolver=cloudflare
+    networks:
+      - traefik-network
+
+volumes:
+  uptimekuma-data:
+    name: uptimekuma-data
+    external: true
+
+networks:
+  traefik-network:
+    name: traefik-network
+    external: true

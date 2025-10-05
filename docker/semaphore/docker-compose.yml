@@ -1,0 +1,109 @@
+x-docker-data: &defaults
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-file: 1
+        max-size: 100m
+# ---
+services:
+  semaphore:
+    <<: *defaults
+    container_name: semaphore
+    image: semaphoreui/semaphore:v2.16.18
+    # ports:
+    #   - 9000:9000
+    volumes:
+      - semaphore-lib:/var/lib/semaphore
+      - semaphore-etc:/etc/semaphore
+      - semaphore-tmp:/tmp/semaphore
+    environment:
+      TZ: ${TZ}
+      SEMAPHORE_PORT: "9000"
+      SEMAPHORE_SCHEDULE_TIMEZONE: ${TZ}
+
+      SEMAPHORE_WEB_ROOT: "/"
+      SEMAPHORE_TOTP_ENABLED: "True"
+      SEMAPHORE_TOTP_ALLOW_RECOVERY: "True"
+
+      SEMAPHORE_ADMIN: ${ADMIN_USERNAME}
+      SEMAPHORE_ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      SEMAPHORE_ADMIN_NAME: ${ADMIN_NAME}
+      SEMAPHORE_ADMIN_EMAIL: ${ADMIN_EMAIL}
+
+      SEMAPHORE_DB_DIALECT: postgres
+      SEMAPHORE_DB_NAME: ${POSTGRES_DB}
+      SEMAPHORE_DB_HOST: ${POSTGRES_HOST}
+      SEMAPHORE_DB_USER: ${POSTGRES_USER}
+      SEMAPHORE_DB_PASS: ${POSTGRES_PASSWORD}
+
+      SEMAPHORE_EMAIL_ALERT: ${SEMAPHORE_EMAIL_ALERT}
+      SEMAPHORE_EMAIL_SENDER: ${SEMAPHORE_EMAIL_SENDER}
+      SEMAPHORE_EMAIL_HOST: ${SEMAPHORE_EMAIL_HOST}
+      SEMAPHORE_EMAIL_PORT: ${SEMAPHORE_EMAIL_PORT}
+      SEMAPHORE_EMAIL_USERNAME: ${SEMAPHORE_EMAIL_USERNAME}
+      SEMAPHORE_EMAIL_PASSWORD: ${SEMAPHORE_EMAIL_PASSWORD}
+      SEMAPHORE_EMAIL_SECURE: ${SEMAPHORE_EMAIL_SECURE}
+      SEMAPHORE_EMAIL_TLS: ${SEMAPHORE_EMAIL_TLS}
+
+    depends_on:
+      - semaphore-postgres
+    labels:
+      - traefik.enable=true
+      - traefik.http.services.semaphore.loadbalancer.server.port=9000
+      - traefik.http.services.semaphore.loadbalancer.server.scheme=http
+      - traefik.http.routers.semaphore.service=semaphore
+      - traefik.http.routers.semaphore.rule=Host(`semaphore.your-domain.com`)
+      - traefik.http.routers.semaphore.entrypoints=websecure
+      - traefik.http.routers.semaphore.tls=true
+      - traefik.http.routers.semaphore.tls.certresolver=cloudflare
+    networks:
+      - semaphore-network
+      - traefik-network
+
+  semaphore-postgres:
+    <<: *defaults
+    container_name: semaphore-postgres
+    image: docker.io/library/postgres:18.0-alpine
+    # ports:
+    #   - 5432:5432
+    volumes:
+      - semaphore-postgres:/var/lib/postgresql/data
+    environment:
+      TZ: ${TZ}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "${POSTGRES_USER}"']
+      start_period: 30s
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    networks:
+      - semaphore-network
+
+volumes:
+  semaphore-lib:
+    name: semaphore-lib
+    external: true
+  semaphore-etc:
+    name: semaphore-etc
+    external: true
+  semaphore-tmp:
+    name: semaphore-tmp
+    external: true
+  semaphore-postgres:
+    name: semaphore-postgres
+    external: true
+
+networks:
+  semaphore-network:
+    name: semaphore-network
+    external: true
+# ---> Comment network if you not use traefik
+  traefik-network:
+    name: traefik-network
+    external: true
+# <---

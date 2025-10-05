@@ -1,0 +1,42 @@
+---
+services:
+  traefik:
+    container_name: traefik
+    image: docker.io/library/traefik:v3.5.0
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-file: 1
+        max-size: 100m
+    ports:
+      - 80:80
+      - 443:443
+      # --> (Optional) Enable Dashboard, don't do in production
+      - 8080:8080
+      # <--
+    volumes:
+      - /run/docker.sock:/run/docker.sock:ro
+      - /opt/docker/traefik/config/:/etc/traefik/:ro
+      - /opt/docker/traefik/certs/:/var/traefik/certs/:rw
+    environment:
+      - TZ=Asia/Jakarta
+      - CF_DNS_API_TOKEN=your-cloudflare-api-token  # <-- Change this to your Cloudflare API Token
+    networks:
+      - traefik-network
+    labels:
+      - traefik.enable=true
+      - traefik.http.services.traefik-oci.loadbalancer.server.port=8080
+      - traefik.http.services.traefik-oci.loadbalancer.server.scheme=http
+      - traefik.http.routers.traefik-oci.middlewares=authentik@file
+      - traefik.http.routers.traefik-oci.middlewares=ipallowlist@file
+      - traefik.http.routers.traefik-oci.service=traefik-oci
+      - traefik.http.routers.traefik-oci.entrypoints=websecure
+      - traefik.http.routers.traefik-oci.rule=Host(`traefik.your-domain.com`)
+      - traefik.http.routers.traefik-oci.tls=true
+      - traefik.http.routers.traefik-oci.tls.certresolver=cloudflare
+
+networks:
+  traefik-network:
+    name: traefik-network
+    external: true  # <-- (Optional) Change this to false if you want to create a new network

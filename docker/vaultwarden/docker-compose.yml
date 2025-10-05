@@ -1,0 +1,65 @@
+services:
+  vaultwarden:
+    container_name: vaultwarden
+    hostname: vaultwarden.your-domain.com
+    image: vaultwarden/server:1.34.3-alpine
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-file: 1
+        max-size: 100m
+    # ports:
+    #   - 80:80
+    volumes:
+      - vaultwarden-data:/data:rw
+    environment:
+      TZ: Asia/Jakarta
+      ADMIN_TOKEN: $argon2i$v=19$m=4096,t=3,p=1$Q1JHRmNzcEpsN08zM3pSdDBEWE9iQWdvMkZsU1pHM3hLeVdYQXk5WUErZz0$qKW5EdzI1oPyn9U2gzenBJ2aVPpwK8ojVYlX41PMubY
+      WEBSOCKET_ENABLED: true
+      SIGNUPS_ALLOWED: false
+      # Optional: can setting in https://vaultwarden.your-domain.com/admin
+      # SMTP_HOST: ${SMTP_HOST}
+      # SMTP_FROM: ${SMTP_FROM}
+      # SMTP_PORT: ${SMTP_PORT}
+      # SMTP_SSL: ${SMTP_SSL}
+      # SMTP_USERNAME: ${SMTP_USERNAME}
+      # SMTP_PASSWORD: ${SMTP_PASSWORD}
+      DOMAIN: https://vaultwarden.your-domain.com
+    labels:
+      - traefik.enable=true
+      - traefik.http.services.vaultwarden.loadbalancer.server.port=80
+      - traefik.http.services.vaultwarden.loadbalancer.server.scheme=http
+      - traefik.http.routers.vaultwarden.service=vaultwarden
+      - traefik.http.routers.vaultwarden.rule=Host(`vaultwarden.your-domain.com`)
+      - traefik.http.routers.vaultwarden.entrypoints=websecure
+      - traefik.http.routers.vaultwarden.tls=true
+      - traefik.http.routers.vaultwarden.tls.certresolver=cloudflare
+    networks:
+      - traefik-network
+
+volumes:
+  vaultwarden-data:
+    name: vaultwarden-data
+    external: true
+
+networks:
+  traefik-network:
+    name: traefik-network
+    external: true
+
+# Dependency: argon2
+# sudo apt install argon2
+
+# Genearete ADMIN_TOKEN:
+# echo "zajxpJtQ8L5lxOrne+gVswZf2AtqUGxkIrVGdySTDj0=" | argon2 "CRGFcspJl7O33zRt0DXObAgo2FlSZG3xKyWXAy9YA+g="
+
+# Output:
+# Type:           Argon2i
+# Iterations:     3
+# Memory:         4096 KiB
+# Parallelism:    1
+# Hash:           a8a5b911dcc8d683f29fd5368337a7049d9a54fa702bca23558957e353ccb9b6
+# Encoded:        $argon2i$v=19$m=4096,t=3,p=1$Q1JHRmNzcEpsN08zM3pSdDBEWE9iQWdvMkZsU1pHM3hLeVdYQXk5WUErZz0$qKW5EdzI1oPyn9U2gzenBJ2aVPpwK8ojVYlX41PMubY
+# 0.011 seconds
+# Verification ok

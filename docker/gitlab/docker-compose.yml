@@ -1,0 +1,115 @@
+x-docker-data: &defaults
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-file: 1
+        max-size: 100m
+
+services:
+  gitlab:
+    <<: *defaults
+    container_name: gitlab
+    hostname: git.your-domain.com
+    image: docker.io/gitlab/gitlab-ce:18.4.0-ce.0
+    shm_size: '256m'
+    environment:
+      TZ: Asia/Jakarta
+      HOSTNAME: git.your-domain.com
+      GITLAB_OMNIBUS_CONFIG: "from_file('/config/gitlab.rb')"
+    volumes:
+      - /opt/docker/gitlab/config:/config
+      - gitlab-etc:/etc/gitlab
+      - gitlab-log:/var/log/gitlab
+      - gitlab-opt:/var/opt/gitlab
+    ports:
+      # - 80:80
+      # - 443:443
+      - 22:22
+    depends_on:
+      - gitlab-postgres
+      - gitlab-redis
+    labels:
+      - traefik.enable=true
+      # Gitlab
+      - traefik.http.services.gitlab.loadbalancer.server.port=80
+      - traefik.http.services.gitlab.loadbalancer.server.scheme=http
+      - traefik.http.routers.gitlab.service=gitlab
+      - traefik.http.routers.gitlab.rule=Host(`gitlab.your-domain.com`)
+      - traefik.http.routers.gitlab.entrypoints=websecure
+      - traefik.http.routers.gitlab.tls=true
+      - traefik.http.routers.gitlab.tls.certresolver=cloudflare
+      # Registry
+      - traefik.http.services.registry.loadbalancer.server.port=5678
+      - traefik.http.services.registry.loadbalancer.server.scheme=http
+      - traefik.http.routers.registry.service=registry
+      - traefik.http.routers.registry.rule=Host(`registry.gitlab.your-domain.com`)
+      - traefik.http.routers.registry.entrypoints=websecure
+      - traefik.http.routers.registry.tls=true
+      - traefik.http.routers.registry.tls.certresolver=cloudflare
+    networks:
+      - gitlab-network
+      - traefik-network
+
+  gitlab-redis:
+    <<: *defaults
+    image: docker.io/library/redis:8.2.2-alpine
+    container_name: gitlab-redis
+    command: --save 60 1 --loglevel warning
+    environment:
+      TZ: Asia/Jakarta
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 3s
+    volumes:
+      - gitlab-redis:/data
+    networks:
+      - gitlab-network
+
+  gitlab-postgres:
+    <<: *defaults
+    image: docker.io/library/postgres:18.0-alpine
+    container_name: gitlab-postgres
+    environment:
+      TZ: Asia/Jakarta
+      POSTGRES_USER: gitlab
+      POSTGRES_PASSWORD: postgres-password
+      POSTGRES_DB: gitlab
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "${POSTGRES_USER}"']
+      start_period: 30s
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    volumes:
+      - gitlab-postgres:/var/lib/postgresql/data
+    networks:
+      - gitlab-network
+
+volumes:
+  gitlab-etc:
+    name: gitlab-etc
+    external: true
+  gitlab-log:
+    name: gitlab-log
+    external: true
+  gitlab-opt:
+    name: gitlab-opt
+    external: true
+  gitlab-postgres:
+    name: gitlab-postgres
+    external: true
+  gitlab-redis:
+    name: gitlab-redis
+    external: true
+
+networks:
+  gitlab-network:
+    name: gitlab-network
+    external: true
+  traefik-network:
+    name: traefik-network
+    external: true

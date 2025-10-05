@@ -1,0 +1,16 @@
+# http:
+#   routers:
+#     external-service-eg-nas:
+#       entryPoints:
+#         - websecure
+#       rule: "Host(`external-service-eg-nas.dezones.com`)"
+#       service: external-service-eg-nas
+#       tls:
+#         certResolver: cloudflare
+
+#   services:
+#     external-service-eg-nas:
+#       loadBalancer:
+#         servers:
+#           - url: "http://ip-or-domain-internal:port"
+#         passHostHeader: true

@@ -1,0 +1,151 @@
+---
+x-docker-data: &defaults
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-file: 1
+        max-size: 100m
+
+services:
+  authentik-server:
+    <<: *defaults
+    container_name: authentik-server
+    image: ${AUTHENTIK_IMAGE}
+    command: server
+    # ports:
+    #   - 9000:9000
+    #   - 9443:9443
+    volumes:
+      - authentik-media:/media
+      - authentik-templates:/templates
+    environment:
+      TZ: ${TZ}
+      AUTHENTIK_ENABLED: true
+      AUTHENTIK_LOG_LEVEL: error
+      AUTHENTIK_ERROR_REPORTING__ENABLED: true
+      AUTHENTIK_ERROR_REPORTING__SEND_PII: false
+      AUTHENTIK_EVENTS__CONTEXT_PROCESSORS__ASN: /geoip/GeoLite2-ASN.mmdb
+      AUTHENTIK_EVENTS__CONTEXT_PROCESSORS__GEOIP: /geoip/GeoLite2-City.mmdb
+      AUTHENTIK_OUTPOSTS__CONTAINER_IMAGE_BASE: ghcr.io/goauthentik/%(type)s:%(version)s
+      AUTHENTIK_WEB__PATH: /
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
+
+      AUTHENTIK_EMAIL__FROM: ${AUTHENTIK_EMAIL__FROM}
+      AUTHENTIK_EMAIL__HOST: ${AUTHENTIK_EMAIL__HOST}
+      AUTHENTIK_EMAIL__USERNAME: ${AUTHENTIK_EMAIL__USERNAME}
+      AUTHENTIK_EMAIL__PASSWORD: ${AUTHENTIK_EMAIL__PASSWORD}
+      AUTHENTIK_EMAIL__PORT: ${AUTHENTIK_EMAIL__PORT}
+      AUTHENTIK_EMAIL__TIMEOUT: ${AUTHENTIK_EMAIL__TIMEOUT}
+      AUTHENTIK_EMAIL__USE_SSL: ${AUTHENTIK_EMAIL__USE_SSL}
+      AUTHENTIK_EMAIL__USE_TLS: ${AUTHENTIK_EMAIL__USE_TLS}
+
+      AUTHENTIK_POSTGRESQL__NAME: ${POSTGRES_DB}
+      AUTHENTIK_POSTGRESQL__HOST: ${POSTGRES_HOST}
+      AUTHENTIK_POSTGRESQL__PORT: ${POSTGRES_PORT}
+      AUTHENTIK_POSTGRESQL__USER: ${POSTGRES_USER}
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${POSTGRES_PASSWORD}
+
+      AUTHENTIK_REDIS__HOST: authentik-redis
+    depends_on:
+      - authentik-postgres
+      - authentik-redis
+    labels:
+      - traefik.enable=true
+      - traefik.http.services.authentik.loadbalancer.server.port=9000
+      - traefik.http.services.authentik.loadbalancer.server.scheme=http
+      - traefik.http.routers.authentik.service=authentik
+      - traefik.http.routers.authentik.entrypoints=websecure
+      - traefik.http.routers.authentik.rule=Host(`authentik.your-domain.com`)
+      - traefik.http.routers.authentik.tls=true
+      - traefik.http.routers.authentik.tls.certresolver=cloudflare
+    networks:
+      - authentik-network
+      - traefik-network
+
+  authentik-worker:
+    <<: *defaults
+    container_name: authentik-worker
+    image: ${AUTHENTIK_IMAGE}
+    user: root
+    command: worker
+    volumes:
+      - /run/docker.sock:/run/docker.sock
+      - authentik-media:/media
+      - authentik-certs:/certs
+      - authentik-templates:/templates
+    environment:
+      <<: *env
+      TZ: ${TZ}
+    depends_on:
+      - authentik-postgres
+      - authentik-redis
+    networks:
+      - authentik-network
+
+  authentik-redis:
+    <<: *defaults
+    container_name: authentik-redis
+    image: ${REDIS_IMAGE}
+    command: --save 60 1 --loglevel warning
+    # ports:
+    #   - 6379:6379
+    volumes:
+      - authentik-redis:/data
+    environment:
+      TZ: ${TZ}
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 3s
+    networks:
+      - authentik-network
+
+  authentik-postgres:
+    <<: *defaults
+    container_name: authentik-postgres
+    image: ${POSTGRES_IMAGE}
+    # ports:
+    #   - 5432:5432
+    volumes:
+      - authentik-postgres:/var/lib/postgresql/data
+    environment:
+      TZ: ${TZ}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "${POSTGRES_USER}"']
+      start_period: 30s
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    networks:
+      - authentik-network
+
+volumes:
+  authentik-postgres:
+    name: authentik-postgres
+    external: true
+  authentik-redis:
+    name: authentik-redis
+    external: true
+  authentik-media:
+    name: authentik-media
+    external: true
+  authentik-certs:
+    name: authentik-certs
+    external: true
+  authentik-templates:
+    name: authentik-templates
+    external: true
+
+networks:
+  authentik-network:
+    name: authentik-network
+    external: true
+  traefik-network:
+    name: traefik-network
+    external: true
