@@ -11,7 +11,7 @@ services:
     <<: *defaults
     container_name: gitlab
     hostname: git.your-domain.com
-    image: docker.io/gitlab/gitlab-ce:18.4.0-ce.0
+    image: docker.io/gitlab/gitlab-ce:18.4.3-ce.0
     shm_size: '256m'
     environment:
       TZ: Asia/Jakarta
@@ -39,14 +39,6 @@ services:
       - traefik.http.routers.gitlab.entrypoints=websecure
       - traefik.http.routers.gitlab.tls=true
       - traefik.http.routers.gitlab.tls.certresolver=cloudflare
-      # Registry
-      - traefik.http.services.registry.loadbalancer.server.port=5678
-      - traefik.http.services.registry.loadbalancer.server.scheme=http
-      - traefik.http.routers.registry.service=registry
-      - traefik.http.routers.registry.rule=Host(`registry.gitlab.your-domain.com`)
-      - traefik.http.routers.registry.entrypoints=websecure
-      - traefik.http.routers.registry.tls=true
-      - traefik.http.routers.registry.tls.certresolver=cloudflare
     networks:
       - gitlab-network
       - traefik-network
@@ -88,6 +80,37 @@ services:
       - gitlab-postgres:/var/lib/postgresql/data
     networks:
       - gitlab-network
+
+  gitlab-registry:
+    <<: *defaults
+    image: docker.io/library/registry:2.8.3
+    container_name: gitlab-registry
+    environment:
+      TZ: Asia/Jakarta
+      HOSTNAME: "registry.git.homelabproject.com"
+      REGISTRY_HTTP_ADDR: "0.0.0.0:5000"
+      REGISTRY_LOG_LEVEL: "warn"
+      REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY: "/var/opt/gitlab/gitlab-rails/shared/registry"
+      REGISTRY_AUTH_TOKEN_REALM: "https://git.homelabproject.com/jwt/auth"
+      REGISTRY_AUTH_TOKEN_SERVICE: "container_registry"
+      REGISTRY_AUTH_TOKEN_ISSUER: "omnibus-gitlab-issuer"
+      REGISTRY_AUTH_TOKEN_ROOTCERTBUNDLE: "/var/opt/gitlab/registry/gitlab-registry.crt"
+      REGISTRY_AUTH_TOKEN_AUTOREDIRECT: "false"
+    labels:
+      - traefik.enable=true
+      # Registry
+      - traefik.http.services.registry.loadbalancer.server.port=5000
+      - traefik.http.services.registry.loadbalancer.server.scheme=http
+      - traefik.http.routers.registry.service=registry
+      - traefik.http.routers.registry.rule=Host(`registry.gitlab.your-domain.com`)
+      - traefik.http.routers.registry.entrypoints=websecure
+      - traefik.http.routers.registry.tls=true
+      - traefik.http.routers.registry.tls.certresolver=cloudflare
+    volumes:
+      - gitlab-opt:/var/opt/gitlab
+    networks:
+      - gitlab-network
+      - traefik-network
 
 volumes:
   gitlab-etc:

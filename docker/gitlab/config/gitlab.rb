@@ -1,9 +1,15 @@
 ### Gitlab settings
 external_url 'https://gitlab.your-domain.com'
-gitlab_rails['gitlab_shell_ssh_port'] = 22
 letsencrypt['enable'] = false
 nginx['listen_port'] = 80
 nginx['listen_https'] = false
+
+gitlab_rails['gitlab_shell_ssh_port'] = 22
+gitlab_rails['enable'] = true # do not disable unless explicitly told to do so in docs
+gitlab_rails['gitlab_ssh_host'] = 'gitlab.your-domain.com'
+gitlab_rails['gitlab_ssh_user'] = ''
+gitlab_rails['time_zone'] = 'Asia/Jakarta'
+
 
 ### Gitlab Prometheus
 prometheus['enable'] = false
@@ -17,12 +23,12 @@ pgbouncer_exporter['enable'] = false
 ### Gitlab Embedded Database
 postgresql['enable'] = false
 redis['enable'] = false
+
 logrotate['enable'] = true
 
-### First boot must true
-gitlab_rails['auto_migrate'] = true
-
 ### Postgres settings
+gitlab_rails['auto_migrate'] = false # First boot must true
+
 gitlab_rails['db_adapter'] = "postgresql"
 gitlab_rails['db_encoding'] = "unicode"
 gitlab_rails['db_collation'] = nil
@@ -49,54 +55,46 @@ gitlab_rails['db_application_name'] = nil
 gitlab_rails['db_database_tasks'] = true
 
 ### GitLab Redis settings
+gitlab_rails['redis_enable_client'] = true
 gitlab_rails['redis_host'] = "gitlab-redis"
 gitlab_rails['redis_port'] = 6379
 # gitlab_rails['redis_ssl'] = $REDIS_SSL
 # gitlab_rails['redis_password'] = $REDIS_PASSWORD
-# gitlab_rails['redis_database'] = 0
-# gitlab_rails['redis_enable_client'] = true
+gitlab_rails['redis_database'] = 0
 # gitlab_rails['redis_tls_ca_cert_dir'] = '/opt/gitlab/embedded/ssl/certs/'
 # gitlab_rails['redis_tls_ca_cert_file'] = '/opt/gitlab/embedded/ssl/certs/cacert.pem'
 # gitlab_rails['redis_tls_client_cert_file'] = nil
 # gitlab_rails['redis_tls_client_key_file'] = nil
 
 ### Gitlab Registry settings
-registry_external_url 'https://registry.gitlab.your-domain.com'
-registry_nginx['enable'] = true
-registry_nginx['listen_port'] = 5678
+registry['enable'] = true
+registry_nginx['enable'] = false
 registry_nginx['listen_https'] = false
+registry_nginx['listen_port'] = 80
+registry_external_url 'https://registry.git.your-domain.com'
 
-# gitlab_rails['registry_enabled'] = true
-# gitlab_rails['registry_host'] = "registry.git.your-domain.com"
-# gitlab_rails['registry_port'] = nil
-# gitlab_rails['registry_path'] = "/var/opt/gitlab/gitlab-rails/shared/registry"
-# gitlab_rails['registry_api_url'] = "http://gitlab-registry:5000"
-# gitlab_rails['registry_key_path'] = "/var/opt/gitlab/gitlab-rails/certificate.key"
-# gitlab_rails['registry_issuer'] = "omnibus-gitlab-issuer"
+gitlab_rails['registry_path'] = '/var/opt/gitlab/gitlab-rails/shared/registry'
 
-# registry['enable'] = true
-# registry['dir'] = "/var/opt/gitlab/registry"
-# registry['log_directory'] = "/var/log/gitlab/registry"
-# registry['log_level'] = "warn"
-# registry['log_formatter'] = "text"
-# registry['rootcertbundle'] = "/var/opt/gitlab/registry/certificate.crt"
-# registry['storage_delete_enabled'] = true
-# registry['validation_enabled'] = true
-# registry['autoredirect'] = false
-# registry['compatibility_schema1_enabled'] = true
+gitlab_rails['registry_enabled'] = true
+gitlab_rails['registry_api_url'] = 'http://gitlab-registry:5000'
+gitlab_rails['registry_host'] = 'registry.git.your-domain.com'
+gitlab_rails['registry_port'] = nil
+gitlab_rails['registry_issuer'] = 'omnibus-gitlab-issuer'
+gitlab_rails['registry_key_path'] = '/var/opt/gitlab/gitlab-rails/certificate.key'
 
-registry['database'] = {
-  'enabled' => false,
-  'host' => 'gitlab-postgres',
-  'port' => 5432,
-  'user' => 'gitlab',
-  'password' => 'postgres-password',
-  'dbname' => 'gitlab',
-  'sslmode' => 'nil',
-  'sslcert' => 'nil',
-  'sslkey' => 'nil',
-  'sslrootcert' => 'nil'
+registry['dir'] = '/var/opt/gitlab/registry'
+registry['log_directory'] = '/var/log/gitlab/registry'
+registry['log_directory'] = '/var/log/gitlab/registry'
+registry['env_directory'] = '/opt/gitlab/etc/registry/env'
+registry['env'] = {
+	'SSL_CERT_DIR' => '/opt/gitlab/embedded/ssl/certs/'
 }
+registry['storage_delete_enabled'] = true
+registry['validation_enabled'] = true
+registry['autoredirect'] = false
+registry['compatibility_schema1_enabled'] = true
+registry['log_level'] = 'warn'
+registry['log_formatter'] = 'text'
 
 registry['gc'] = { 
   'disabled' => false,
