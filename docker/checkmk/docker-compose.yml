@@ -2,7 +2,7 @@ version: '3.7'
 services:
   checkmk-server:
     container_name: checkmk-server
-    image: checkmk/check-mk-raw:2.0.0-latest
+    image: checkmk/check-mk-raw:2.4.0-latest
     restart: always
     tmpfs:
       - /opt/omd/sites/checkmk/tmp:uid=1000,gid=1000
