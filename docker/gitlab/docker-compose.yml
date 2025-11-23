@@ -45,7 +45,7 @@ services:
 
   gitlab-redis:
     <<: *defaults
-    image: docker.io/library/redis:8.2.2-alpine
+    image: docker.io/library/redis:8.4.0-alpine
     container_name: gitlab-redis
     command: --save 60 1 --loglevel warning
     environment:
