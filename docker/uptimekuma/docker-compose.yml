@@ -3,7 +3,7 @@
 services:
   uptimekuma-dezones:
     container_name: uptimekuma-dezones
-    image: louislam/uptime-kuma:1.23.17
+    image: louislam/uptime-kuma:2.0.2
     restart: unless-stopped
     logging:
       driver: "json-file"
