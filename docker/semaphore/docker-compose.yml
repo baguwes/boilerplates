@@ -10,7 +10,7 @@ services:
   semaphore:
     <<: *defaults
     container_name: semaphore
-    image: semaphoreui/semaphore:v2.16.18
+    image: semaphoreui/semaphore:v2.16.45
     # ports:
     #   - 9000:9000
     volumes:
