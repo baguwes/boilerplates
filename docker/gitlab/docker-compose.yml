@@ -63,7 +63,7 @@ services:
 
   gitlab-postgres:
     <<: *defaults
-    image: docker.io/library/postgres:18.0-alpine
+    image: docker.io/library/postgres:18.1-alpine
     container_name: gitlab-postgres
     environment:
       TZ: Asia/Jakarta

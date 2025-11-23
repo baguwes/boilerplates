@@ -49,7 +49,7 @@ services:
   n8n-postgres:
     <<: *defaults
     container_name: n8n-postgres
-    image: docker.io/library/postgres:18.0-alpine
+    image: docker.io/library/postgres:18.1-alpine
     # ports:
     #   - 5432:5432
     volumes:
