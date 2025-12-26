@@ -1,0 +1,40 @@
+services:
+  registry-cache:
+    image: docker.io/library/registry:3.0.0
+    container_name: registry-cache
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-file: 1
+        max-size: 100m
+    # ports:
+    #   - "5000:5000"
+    #   - "5001:5001"
+    volumes:
+      - registry-data:/var/lib/registry
+      - /opt/docker/registry/config.yml:/etc/distribution/config.yml:ro
+    environment:
+      TZ: Asia/Jakarta
+      OTEL_TRACES_EXPORTER: none
+    labels:
+      - traefik.enable=true
+      - traefik.http.services.registry-cache.loadbalancer.server.port=5000
+      - traefik.http.services.registry-cache.loadbalancer.server.scheme=http
+      - traefik.http.routers.registry-cache.service=registry-cache
+      - traefik.http.routers.registry-cache.rule=Host(`registry.your-domain.com`)
+      - traefik.http.routers.registry-cache.entrypoints=websecure
+      - traefik.http.routers.registry-cache.tls=true
+      - traefik.http.routers.registry-cache.tls.certresolver=cloudflare
+    networks:
+      - traefik-network
+
+volumes:
+  registry-data:
+    name: registry-data
+    external: true
+
+networks:
+  traefik-network:
+    name: traefik-network
+    external: true

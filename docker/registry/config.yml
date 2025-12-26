@@ -1,0 +1,47 @@
+version: 0.1
+
+log:
+  level: info
+  fields:
+    service: registry
+    environment: development
+
+storage:
+  filesystem:
+    rootdirectory: /var/lib/registry
+  delete:
+    enabled: true
+  maintenance:
+    uploadpurging:
+      enabled: true
+      age: 24h
+      interval: 24h
+      dryrun: false
+  cache:
+      blobdescriptor: inmemory
+  tag:
+    concurrencylimit: 5
+
+http:
+  addr: :5000
+  host: https://registry.your-domain.com
+  headers:
+    X-Content-Type-Options: [nosniff]
+  debug:
+    addr: :5001
+    prometheus:
+      enabled: true
+      path: /metrics
+
+health:
+  storagedriver:
+    enabled: true
+    interval: 10s
+    threshold: 3
+
+proxy:
+  ttl: 24h
+  remoteurl: https://registry-1.docker.io
+  # Opsional
+  # username: "DOCKERHUB_USERNAME"
+  # password: "DOCKERHUB_ACCESS_TOKEN"
