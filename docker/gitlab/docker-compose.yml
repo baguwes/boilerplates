@@ -83,7 +83,7 @@ services:
 
   gitlab-registry:
     <<: *defaults
-    image: docker.io/library/registry:2.8.3
+    image: docker.io/library/registry:3.1.1
     container_name: gitlab-registry
     environment:
       TZ: Asia/Jakarta
