@@ -2,7 +2,7 @@ services:
   vaultwarden:
     container_name: vaultwarden
     hostname: vaultwarden.your-domain.com
-    image: vaultwarden/server:1.34.3-alpine
+    image: vaultwarden/server:1.37.2-alpine
     restart: unless-stopped
     logging:
       driver: "json-file"
